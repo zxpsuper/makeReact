@@ -6,6 +6,7 @@ import _ from './methods.js'
  * @param {*} container 需要插入的位置
  */
 function render(vdom, container) {
+  console.log(vdom)
   let component
   if (_.isFunction(vdom.nodeName)) {
     if (vdom.nodeName.prototype.render) {
