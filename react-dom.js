@@ -7,18 +7,80 @@ import _ from "./methods.js";
  */
 function render(vdom, container) {
   console.log(vdom);
+  vdomToDom(vdom, container);
+}
+function vdomToDom(vdom, container) {
   let component;
   if (_.isFunction(vdom.nodeName)) {
-    if (vdom.nodeName.prototype.render) {
-      // vdom.nodeName 就是 class, 将属性以 props 方式传给 class
-      component = new vdom.nodeName(vdom.attributes);
-    } else {
-      component = vdom.nodeName(vdom.attributes); // 处理无状态组件：const A = (props) => <div>I'm {props.name}</div>
+    component = createComponent(vdom); // 构造组件
+    setProps(component); // 更改组件 props
+    renderComponent(component); // 渲染组件，将 dom 节点赋值到 component
+    return component.base; // 返回真实 dom
+  }
+  if (component) {
+    return _render(component, container);
+  } else {
+    return _render(vdom, container);
+  }
+}
+/**
+ * 渲染组件，将 dom 节点赋值到 component
+ * @param {*} component
+ */
+function renderComponent(component) {
+  if (component.base && component.shouldComponentUpdate) {
+    const bool = component.shouldComponentUpdate(
+      component.props,
+      component.state
+    );
+    if (!bool && bool !== undefined) {
+      return false; // shouldComponentUpdate() 返回 false，则生命周期终止
     }
   }
-  component ? _render(component, container) : _render(vdom, container);
-}
+  if (component.base && component.componentWillUpdate) {
+    component.componentWillUpdate();
+  }
 
+  const rendered = component.render();
+  const base = vdomToDom(rendered);
+
+  if (component.base && component.componentDidUpdate) {
+    component.componentDidUpdate();
+  } else if (component && component.componentDidMount) {
+    component.componentDidMount();
+  }
+
+  if (component.base && component.base.parentNode) {
+    // setState 进入此逻辑
+    component.base.parentNode.replaceChild(base, component.base);
+  }
+
+  component.base = base; // 标志符
+}
+/**
+ * 设置属性
+ * @param {*} component
+ */
+function setProps(component) {
+  if (component && component.componentWillMount) {
+    component.componentWillMount();
+  } else if (component.base && component.componentWillReceiveProps) {
+    component.componentWillReceiveProps(component.props); // 后面待实现
+  }
+}
+/**
+ * 创建 component
+ * @param {*} vdom 虚拟dom
+ */
+function createComponent(vdom) {
+  if (vdom.nodeName.prototype.render) {
+    // vdom.nodeName 就是 class, 将属性以 props 方式传给 class
+    return new vdom.nodeName(vdom.attributes);
+  } else {
+    // 处理无状态组件：const A = (props) => <div>I'm {props.name}</div>
+    return vdom.nodeName(vdom.attributes);
+  }
+}
 /**
  * render函数续
  * @param {*} component
@@ -49,7 +111,7 @@ export function _render(component, container) {
   }
   // 如果组件没有容器属性，则赋值改组件的容器属性，再插入
   component.container = container;
-  container.appendChild(dom);
+  container.appendChild(dom); // 兼容沙盒模式
 }
 
 /**
